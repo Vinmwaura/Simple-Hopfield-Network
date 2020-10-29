@@ -18,6 +18,7 @@ https://en.wikipedia.org/wiki/Hopfield_network
 http://staff.itee.uq.edu.au/janetw/cmc/chapters/Hopfield/
 http://web.cs.ucla.edu/~rosen/161/notes/hopfield.html
 """
+import cv2
 import numpy as np
 from random import shuffle
 
@@ -32,7 +33,8 @@ class Hopfield:
 
     def update_net(self, input_vector):
         """
-        Update each node randomly until convergence
+        Update each node asynchronously until convergence.
+        Convergence occurs when all nodes are updated and no change occurs
         v_in = sum(w_ij * v_j)
         if v_in >= threshold, v_in=1
         else v_in=1
@@ -70,14 +72,59 @@ class Hopfield:
         self.weight_matrix = new_weight_matrix
 
 
+# Draws Binary Training Images, Corrupt Images and Reconstructed Images
+def draw_images(train_img, corrupt_img, recon_img):
+    combined_imgs = np.hstack((train_img, corrupt_img))
+    combined_imgs = np.hstack((combined_imgs, recon_img))
+    print("Press Q to exit when window is selected")
+    cv2.imshow("Train/Corrupt/Reconstructed image", combined_imgs)
+    if cv2.waitKey(0) == ord('q'):
+        cv2.destroyAllWindows()
+
+
 def main():
+    # Simple Binary Vector Example
     input_vector = np.array([[[1, 1, 1, 0]]])
     noisy_input = np.array([[0, 0, 1, 0]])
 
+    # Basic hopfield net for storing and reconstructing single vector example
     hopfield_net = Hopfield(neuron_num=4, threshold=0)
     hopfield_net.train_net(input_vector)
     reconstructed_input = hopfield_net.update_net(noisy_input)
-    print("Noisy Input: ", noisy_input, " Reconstructed Input: ", reconstructed_input)
+    print("Training Input Vector: ", input_vector,
+          " Noisy Input Vector: ", noisy_input,
+          " Reconstructed Input Vector: ", reconstructed_input)
+
+    # Simple 64 * 64 Binary Vector Example
+    img = cv2.imread('test_image.jpeg', 0)
+
+    # Converts Grayscale image to binary image( 0's and 1's only)
+    img = img / 255
+    img[img < 0.5] = 0
+    img[img >= 0.5] = 1
+
+    # Resizes image to easier to handle 64 *64 size: 4096 nodes
+    img = cv2.resize(img, (64, 64))
+
+    # Make half the image corrupted (Noisy)
+    noise = np.zeros((1, 1, 64 * 64))
+    noise[:, :, :int(4096 / 2)] = 1
+
+    # Converts 64*64 image and noisy image to vectors of size: (1, 1, 4096)
+    input_vector = img.reshape(1, 1, 64 * 64)
+    noisy_input = input_vector.copy() * noise
+
+    # Hopfield Net 2 Training and Updates
+    hopfield_img_net = Hopfield(neuron_num=64 * 64, threshold=0)
+    hopfield_img_net.train_net(input_vector)
+    reconstructed_input = hopfield_img_net.update_net(noisy_input)
+
+    # Reshape noisy and reconstructed vector to 64*64 images
+    noisy_input = noisy_input.reshape(64, 64)
+    reconstructed_img = reconstructed_input.reshape(64, 64)
+
+    # Draws binary images including reconstructed image
+    draw_images(img, noisy_input, reconstructed_img)
 
 
 if __name__ == '__main__':
